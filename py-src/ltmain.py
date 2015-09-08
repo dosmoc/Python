@@ -152,7 +152,11 @@ def stopped():
   return stop
 
 def featureFlags(code):
-  names = code.co_names[1:]
+  futureItems = __future__.__dict__.iteritems()
+  #ensure we only try to get flags for features
+  featureNames = [k for  k,v in futureItems if hasattr(v, 'compiler_flag')]
+  names = [n for n in code.co_names[1:] if n in featureNames]
+
   return [getattr(__future__, name).compiler_flag for name in names]
 
 def addFlags(current, new):

@@ -14,6 +14,9 @@ import time
 import asyncore
 import signal
 import lttools
+import __future__
+import operator
+import functools
 
 oldout = sys.stdout
 olderr = sys.stderr
@@ -21,6 +24,7 @@ stop = False
 local = True
 threads = []
 currentClient = 0
+compilerFlags = 0
 
 class Printer():
   cur = ""
@@ -147,6 +151,14 @@ def stopped():
   global stop
   return stop
 
+def featureFlags(code):
+  names = code.co_names[1:]
+  return [getattr(__future__, name).compiler_flag for name in names]
+
+def addFlags(current, new):
+  new.append(current)
+  return functools.reduce(operator.or_, new)
+
 def handleEval(data):
   result = None
   code = cleanCode(data[2]["code"])
@@ -190,11 +202,14 @@ def handleEval(data):
       loc = form[0]
       isEval = False
       try:
-        code= compile(ensureUtf(code), ensureUtf(data[2]["name"]), 'eval')
+        code= compile(ensureUtf(code), ensureUtf(data[2]["name"]), 'eval', compilerFlags)
         isEval = True
       except:
         try:
-          code= compile(ensureUtf(code), ensureUtf(data[2]["name"]), 'exec')
+          global compilerFlags
+          code= compile(ensureUtf(code), ensureUtf(data[2]["name"]), 'exec', compilerFlags)
+          if code.co_names[0] == '__future__':
+            compilerFlags = addFlags(compilerFlags, featureFlags(code))
         except:
           e = traceback.format_exc()
           send(data[0], "editor.eval.python.exception", {"ex": cleanTrace(e), "meta": loc})
